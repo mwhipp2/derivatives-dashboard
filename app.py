@@ -50,8 +50,8 @@ _company_names: dict[str, str] = {}
 def _get_company_name(symbol: str) -> str:
     if symbol not in _company_names:
         try:
-            import yfinance as yf
-            info = yf.Ticker(symbol).info
+            from yfinance_client import _ticker
+            info = _ticker(symbol).info
             _company_names[symbol] = info.get("longName") or info.get("shortName") or symbol
         except Exception:
             _company_names[symbol] = symbol

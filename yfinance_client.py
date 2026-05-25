@@ -17,8 +17,30 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Optional
 
+import requests as _requests
 import yfinance as yf
 from scipy.stats import norm
+
+# ── Browser-like session ──────────────────────────────────────────────────────
+# Yahoo Finance blocks plain Python requests from cloud server IP ranges
+# (Render, AWS, GCP, etc.).  Routing all yfinance calls through a persistent
+# session with a realistic browser User-Agent bypasses the block.
+
+_YF_SESSION = _requests.Session()
+_YF_SESSION.headers.update({
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Accept-Encoding": "gzip, deflate, br",
+})
+
+def _ticker(symbol: str) -> yf.Ticker:
+    """Always return a Ticker wired to the browser-like session."""
+    return yf.Ticker(symbol, session=_YF_SESSION)
 
 # ── TTL cache ─────────────────────────────────────────────────────────────────
 # Keyed by arbitrary string; value is (result, monotonic_timestamp).
@@ -93,7 +115,7 @@ def _spot_price(symbol: str, ticker=None) -> float:
       3. 5-day daily history   — always works, uses prior close after hours
     Accepts an existing Ticker to avoid creating a duplicate object.
     """
-    t = ticker or yf.Ticker(symbol)
+    t = ticker or _ticker(symbol)
 
     # Tier 1: fast_info (yfinance ≥ 0.2)
     try:
@@ -150,7 +172,7 @@ class YFinanceClient:
             if hit:
                 return sym, cached
             try:
-                hist = yf.Ticker(sym).history(period="5d", interval="1d", auto_adjust=True)
+                hist = _ticker(sym).history(period="5d", interval="1d", auto_adjust=True)
                 if hist.empty:
                     raise ValueError("no history")
                 last = round(float(hist["Close"].iloc[-1]), 2)
@@ -217,7 +239,7 @@ class YFinanceClient:
         yf_interval = freq_map.get(frequency_type, "1d")
 
         try:
-            df = yf.Ticker(symbol).history(period=yf_period, interval=yf_interval, auto_adjust=True)
+            df = _ticker(symbol).history(period=yf_period, interval=yf_interval, auto_adjust=True)
             candles = []
             for ts, row in df.iterrows():
                 candles.append({
@@ -245,7 +267,7 @@ class YFinanceClient:
         if hit:
             return cached
         try:
-            exps = yf.Ticker(symbol).options   # tuple of date strings
+            exps = _ticker(symbol).options   # tuple of date strings
             today = datetime.today().date()
             result = [e for e in exps
                       if datetime.strptime(e, "%Y-%m-%d").date() >= today]
@@ -278,7 +300,7 @@ class YFinanceClient:
         last_error = ""
         for attempt in range(2):   # retry once on transient failure
             try:
-                ticker = yf.Ticker(symbol)
+                ticker = _ticker(symbol)
                 spot   = _spot_price(symbol, ticker=ticker)
                 today  = datetime.today()
                 r      = 0.053
