@@ -6,4 +6,4 @@ services:
     startCommand: gunicorn app:server --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 120
     envVars:
       - key: WATCHLIST
-        value: ORCL,PLTR,SOFI,BAC,NKE,WMT,NVDA
+        value: NVDA,SLB,NKE,INTC,WMT,BAC,ORCL,PLTR,NOW,SOFI
