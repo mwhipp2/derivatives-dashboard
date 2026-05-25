@@ -1,0 +1,26 @@
+# Secrets — never commit these
+.env
+.schwab_tokens.json
+
+# Runtime state files — ephemeral, not part of the codebase
+watchlist.json
+watchlist.bak.json
+watchlist.tmp
+last_symbol.json
+last_symbol.bak.json
+last_symbol.tmp
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
