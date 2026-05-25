@@ -8,3 +8,4 @@ python-dotenv>=1.0.0
 yfinance>=0.2.40
 scipy>=1.13.0
 gunicorn>=21.2.0
+curl_cffi>=0.7.0

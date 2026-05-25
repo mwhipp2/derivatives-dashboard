@@ -21,25 +21,36 @@ import requests as _requests
 import yfinance as yf
 from scipy.stats import norm
 
-# ── Browser-like session ──────────────────────────────────────────────────────
-# Yahoo Finance blocks plain Python requests from cloud server IP ranges
-# (Render, AWS, GCP, etc.).  Routing all yfinance calls through a persistent
-# session with a realistic browser User-Agent bypasses the block.
+# ── Browser-impersonation session ────────────────────────────────────────────
+# Yahoo Finance checks both HTTP headers AND the TLS fingerprint of the
+# connection.  Plain requests.Session only spoofs headers — Yahoo still sees
+# a Python TLS handshake and blocks cloud IPs.
+#
+# curl_cffi impersonates a real Chrome browser at the TLS level (cipher
+# suites, extension order, ALPN), which reliably bypasses the block.
+# Falls back to a plain requests session if curl_cffi is not available.
 
-_YF_SESSION = _requests.Session()
-_YF_SESSION.headers.update({
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.5",
-    "Accept-Encoding": "gzip, deflate, br",
-})
+try:
+    from curl_cffi import requests as _cffi
+    _YF_SESSION = _cffi.Session(impersonate="chrome120")
+    print("✅  yfinance session: curl_cffi / Chrome120 TLS impersonation")
+except Exception:
+    _YF_SESSION = _requests.Session()
+    _YF_SESSION.headers.update({
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+    })
+    print("⚠️   yfinance session: requests fallback (curl_cffi unavailable)")
+
 
 def _ticker(symbol: str) -> yf.Ticker:
-    """Always return a Ticker wired to the browser-like session."""
+    """Always return a Ticker wired to the browser-impersonation session."""
     return yf.Ticker(symbol, session=_YF_SESSION)
 
 # ── TTL cache ─────────────────────────────────────────────────────────────────
